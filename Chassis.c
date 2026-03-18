@@ -9,17 +9,20 @@
 #include "data_poll.h"
 #include "My_list.h"
 
+extern SemaphoreHandle_t remote_semaphore;
+
 //遥控器
 PackControl_t recv_pack;
 uint8_t recv_buff[20] = {0};
 float rocker_filter[4] = {0};
 uint8_t usart5_buff[30];
+
 //电机驱动
 Motor_param motor1 = {
 .PID = {
-	.Kp = 0.0f,
+	.Kp = 5.0f,
 	.Ki = 0.0f,
-	.Kd = 0.0f,
+	.Kd = 30.0f,
 	.limit = 10000.0f,
 	.output_limit = 40.0f,
 },
@@ -30,9 +33,9 @@ Motor_param motor1 = {
 };
 Motor_param motor2 = {
 .PID = {
-	.Kp = 0.0f,
+	.Kp = 5.0f,
 	.Ki = 0.0f,
-	.Kd = 0.0f,
+	.Kd = 30.0f,
 	.limit = 10000.0f,
 	.output_limit = 40.0f,
 },
@@ -43,9 +46,9 @@ Motor_param motor2 = {
 };
 Motor_param motor3 = {
 .PID = {
-	.Kp = 0.0f,
+	.Kp = 5.0f,
 	.Ki = 0.0f,
-	.Kd = 0.0f,
+	.Kd = 30.0f,
 	.limit = 10000.0f,
 	.output_limit = 40.0f,
 },
@@ -63,7 +66,6 @@ Motor_param motor3 = {
 //extern GPIO_PinState GPIOB12_State;
 //extern GPIO_PinState GPIOB13_State;
 extern uint8_t flag;
-
 
 //遥控模式
 Positon_label MODE = REMOTE;
@@ -99,7 +101,7 @@ void Remote(void *pvParameters)
 			v3 = Vy + R * Wz;			
 			
 			wheel_one=  -((v1 / (2.0f * PI * WHEEL_RADIUS)) * 60.0f);
-			wheel_two = ((v2 / (2.0f * PI * WHEEL_RADIUS)) * 60.0f);
+			wheel_two = (( v2 / (2.0f * PI * WHEEL_RADIUS)) * 60.0f);
 			wheel_three=-((v3 / (2.0f * PI * WHEEL_RADIUS)) * 60.0f);
 			
 			PID_Control2((float)(motor1.steering.epm / 7.0f/(3.4f)), wheel_one, &motor1.PID);
@@ -146,53 +148,66 @@ void MyRecvCallback(uint8_t *src, uint16_t size, void *user_data)
     Rocker_Filter(&recv_pack);
 }
 
-extern SemaphoreHandle_t remote_semaphore;
-CommPackRecv_Cb  recv_cb = MyRecvCallback;
+//失联保护变量
+uint32_t last_key_snapshot = 0;
 
+CommPackRecv_Cb recv_cb = MyRecvCallback;
 //遥控任务
 TaskHandle_t Move_Remote_Handle;
 void Move_Remote(void *pvParameters){
 	
 	TickType_t last_wake_time = xTaskGetTickCount();
+	
     g_comm_handle = Comm_Init(&huart5);
     RemoteCommInit(NULL);
     register_comm_recv_cb(recv_cb, 0x01, &recv_pack);
+
+  TickType_t last_remote_update_time = xTaskGetTickCount();
+	
+// 用于检测变化
+    PackControl_t last_pack = {0};
     for(;;)
     {
-      if(xSemaphoreTake(remote_semaphore, pdMS_TO_TICKS(200)) == pdTRUE)
+	      if(memcmp(&recv_pack, &last_pack, sizeof(PackControl_t)) != 0)
         {
-            memcpy(&recv_pack, usart5_buff, sizeof(PackControl_t));
-            Updatekey(&Remote_Control);
-            Remote_Control.Ex =-recv_pack.rocker[1];
-            Remote_Control.Ey = recv_pack.rocker[0];
-            Remote_Control.Eomega = recv_pack.rocker[2];
-            Remote_Control.mode = recv_pack.rocker[3];
-            Remote_Control.Key_Control = (hw_key_t*)&recv_pack.Key;
+					last_remote_update_time = xTaskGetTickCount();
+					memcpy(&last_pack, &recv_pack, sizeof(PackControl_t));
         }
+			
+			if(xTaskGetTickCount() - last_remote_update_time > pdMS_TO_TICKS(200))
+				{
+				Remote_Control.Ex = 0;
+				Remote_Control.Ey = 0;
+				Remote_Control.Eomega = 0;
+				Remote_Control.mode = 0;
+
+				//按键状态清零
+				memset(&recv_pack.Key, 0, sizeof(uint32_t));
+				Remote_Control.Key_Control = (hw_key_t*)&recv_pack.Key;
+				}
 				else
 				{
-            Remote_Control.Ex = 0;
-            Remote_Control.Ey = 0;
-            Remote_Control.Eomega = 0;
-            Remote_Control.mode = 0;
-            //按键状态清零
-            memset(&recv_pack.Key, 0, sizeof(hw_key_t));
-            Remote_Control.Key_Control = (hw_key_t*)&recv_pack.Key;
-        }
-
-     if(MODE == REMOTE)
+				Updatekey(&Remote_Control);
+				Remote_Control.Ex =-recv_pack.rocker[1];
+				Remote_Control.Ey = recv_pack.rocker[0];
+				Remote_Control.Eomega = recv_pack.rocker[2];
+				Remote_Control.mode = recv_pack.rocker[3];
+				Remote_Control.Key_Control = (hw_key_t*)&recv_pack.Key;
+				}
+		
+				if(MODE == REMOTE)
       {
 			  //遥控映射
-				Vx = -(Remote_Control.Ex / 2047.0f) * MAX_VELOCITY;
-				Vy = -(Remote_Control.Ey / 2047.0f) * MAX_VELOCITY;
-				Wz = (Remote_Control.Eomega / 2047.0f) * MAX_OMEGA;
+				Vx = -(Remote_Control.Ex / 1847.0f) * MAX_VELOCITY;
+				Vy = -(Remote_Control.Ey / 1798.0f) * MAX_VELOCITY;
+				Wz = (Remote_Control.Eomega / 1847.0f) * MAX_OMEGA;
 //			//进行击球动作（flag转到hitball.c）
 //			if(Remote_Control.First.Right_Key_Up== 1 && Remote_Control.Second.Right_Key_Up == 0)
 //		  	{
 //		  		flag = 1;
 //			  }
       }
-		vTaskDelayUntil(&last_wake_time, pdMS_TO_TICKS(2));
+		vTaskDelayUntil(&last_wake_time, pdMS_TO_TICKS(1));
     }
 }
 
@@ -200,9 +215,9 @@ void HAL_CAN_RxFifo1MsgPendingCallback(CAN_HandleTypeDef *hcan)
 {
 	uint8_t Recv[8] = {0};
 	uint32_t ID = CAN_Receive_DataFrame(&hcan2, Recv);
-	VESC_ReceiveHandler(&motor1.steering, &hcan2, ID,Recv);
-	VESC_ReceiveHandler(&motor2.steering, &hcan2, ID,Recv);
-	VESC_ReceiveHandler(&motor3.steering, &hcan2, ID,Recv);
+	VESC_ReceiveHandler(&motor1.steering, &hcan2, ID, Recv);
+	VESC_ReceiveHandler(&motor2.steering, &hcan2, ID, Recv);
+	VESC_ReceiveHandler(&motor3.steering, &hcan2, ID, Recv);
 }
 
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t size)
@@ -240,10 +255,10 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
         {
             volatile uint32_t temp_sr = READ_REG(huart->Instance->SR);
         }
-        
-    }
+			}
       Comm_UART_IRQ_Handle(g_comm_handle, &huart5, usart5_buff, 0);
       HAL_UARTEx_ReceiveToIdle_DMA(&huart5, usart5_buff,sizeof(usart5_buff));
       __HAL_DMA_DISABLE_IT(huart5.hdmarx, DMA_IT_HT);
     }
 }
+
