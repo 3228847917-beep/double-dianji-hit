@@ -3,7 +3,7 @@
 
 #include "Task_Init.h"
 #include <stdbool.h>
-#include "PID_old.h"
+#include "PID.h"
 #include "VESC.h"
 
 #define PI 3.14159265359f
@@ -15,10 +15,11 @@
 
 //电机参数
 typedef struct{
-	PID2 PID;
+	PID_EREOR_TypeDef PID;
 	VESC_t steering;
-
+	uint8_t deadband;//死区控制（有效遏制电机抖动）
 }Motor_param;
+
 
 typedef enum {
      STP,//自动模式下的急停
@@ -38,4 +39,5 @@ extern Positon_label MODE;
 void Remote(void *pvParameters);
 void Move_Remote(void *pvParameters);
 
+bool is_remote_active(void);
 #endif
