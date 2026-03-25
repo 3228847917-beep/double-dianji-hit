@@ -17,7 +17,6 @@
 typedef struct{
 	PID2 PID;
 	VESC_t steering;
-
 }Motor_param;
 
 typedef enum {
