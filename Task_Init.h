@@ -17,6 +17,9 @@
 #include "PID_old.h"
 #include "math.h"
 
+
+void Wheel_Task(void *pvParameters);
+
 typedef struct{
 	uint8_t Left_Key_Up;         
 	uint8_t Left_Key_Down;       
@@ -42,8 +45,15 @@ typedef struct {
     hw_key_t First,Second;
 } Remote_Handle_t;
 
+
+
+#define KEY_RISING_EDGE(cur, last, field)  ((cur.field == 1) && (last.field == 0))
+
 extern Remote_Handle_t Remote_Control; //取出遥控器数据
 
+#define KEY_RISING_EDGE(cur, last, field)  ((cur.field == 1) && (last.field == 0))
+
 void Task_Init(void);
+float Gyro_CalcCorrection(float gyro_z);//打滑使用
 
 #endif
