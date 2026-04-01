@@ -11,34 +11,36 @@
 #define MAX_ROBOT_OMEGA PI	 	 //最大角速度
 #define R 0.457f	 	//整车半径
 #define WHEEL_RADIUS 0.075f  //轮的半径
-#define MAX_Acc  5.0f  //水平加速度阈值
+#define MAX_Acc 0.35f
+#define MAX_limit 2.5f
+#define Deadzone_X 0.05f
+#define Deadzone_Z 0.05f
 
 //电机参数
 typedef struct{
 	PID2 PID;
 	VESC_t steering;
+
 }Motor_param;
 
 typedef enum {
      STP,//自动模式下的急停
      STOP,//遥控模式下的急停
      REMOTE,
-	   AUTO,
-}Chassis_MODE;
+	   CHOOSE,
+}Positon_label;
 
 //任务
 extern TaskHandle_t Remote_JY61_Handle;
 extern TaskHandle_t Remote_Handle;
 
 //模式
-extern Chassis_MODE MODE;
+extern Positon_label MODE;
 
 //任务函数
 void Remote(void *pvParameters);
 void Remote_JY61(void *pvParameters);
 
 void Remote_Analysis();
-
-#define KEY_RISING_EDGE(cur, last, field)  ((cur.field == 1) && (last.field == 0))
 
 #endif
