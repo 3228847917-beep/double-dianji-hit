@@ -16,9 +16,9 @@ extern SemaphoreHandle_t remote_semaphore;
 
 //陀螺仪姿态矫正
 PID2 JY61_adjust = {
-	.Kp = 0.8f,
-	.Ki = 0.0f,
-	.Kd = 0.1f,
+	.Kp = 0.4f,
+	.Ki = 0.0005f,
+	.Kd = 0.4f,
 	.limit = 10000.0f,
 	.output_limit = 50.0f,
 };
@@ -71,6 +71,45 @@ Motor_param motor3 = {
 	.hcan = &hcan2,
 }
 };
+//Motor_param motor1 = {
+//.PID = {
+//	.Kp = 1.0f,
+//	.Ki = 0.0f,
+//	.Kd = 0.0f,
+//	.limit = 10000.0f,
+//	.output_limit = 40.0f,
+//},
+//.steering={
+//	.motor_id=0x01,
+//	.hcan = &hcan2,
+//}
+//};
+//Motor_param motor2 = {
+//.PID = {
+//	.Kp = 1.0f,
+//	.Ki = 0.0f,
+//	.Kd = 0.0f,
+//	.limit = 10000.0f,
+//	.output_limit = 40.0f,
+//},
+//.steering={
+//	.motor_id=0x02,
+//	.hcan = &hcan2,
+//}
+//};
+//Motor_param motor3 = {
+//.PID = {
+//	.Kp = 1.0f,
+//	.Ki = 0.0f,
+//	.Kd = 0.0f,
+//	.limit = 10000.0f,
+//	.output_limit = 40.0f,
+//},
+//.steering={
+//	.motor_id=0x03,
+//	.hcan = &hcan2,
+//}
+//};
 //extern GPIO_PinState GPIOA8_State;
 //extern GPIO_PinState GPIOC9_State;
 //extern GPIO_PinState GPIOC2_State;
@@ -121,39 +160,36 @@ static void Key_Parse(uint32_t key, hw_key_t *out)
 }
 
 static float lock_Yaw = 0.0f;
-void Remote_Analysis()
-{
-    if(xSemaphoreTake(remote_semaphore, pdMS_TO_TICKS(200)) == pdTRUE)
-    {
-      /* 1. 保存上一帧 */
-      Remote_Control.Second = Remote_Control.First;
-      /* 2. 解析当前按键 */
-      Key_Parse(recv_pack.Key, &Remote_Control.First);
-			Remote_Control.Ex = recv_pack.rocker[1] / 1647.0f *MAX_ROBOT_VEL;
-			Remote_Control.Ey = recv_pack.rocker[0] / 1648.0f *MAX_ROBOT_VEL;
-			Remote_Control.Eomega = recv_pack.rocker[2] / 1647.0f * MAX_ROBOT_OMEGA;
-    }else {
-	    Remote_Control.Ex = 0;
-      Remote_Control.Ey = 0;
-      Remote_Control.Eomega = 0;
-			
-      memset(&Remote_Control.First, 0, sizeof(Remote_Control.First));
-    }
-}
 //void Remote_Analysis()
 //{
-//	/* 1. 保存上一帧 */
-//	Remote_Control.Second = Remote_Control.First;
-//	/* 2. 解析当前按键 */
-//	Key_Parse(recv_pack.Key, &Remote_Control.First);
-//	
-////	Remote_Control.Ex = recv_pack.rocker[1] / 1977.0f *MAX_ROBOT_VEL;
-////	Remote_Control.Ey = recv_pack.rocker[0] / 1798.0f *MAX_ROBOT_VEL;
-////	Remote_Control.Eomega = recv_pack.rocker[2] / 1847.0f * MAX_ROBOT_OMEGA;
-//	Remote_Control.Ex = recv_pack.rocker[1] / 1647.0f *MAX_ROBOT_VEL;
-//	Remote_Control.Ey = recv_pack.rocker[0] / 1647.0f *MAX_ROBOT_VEL;
-//	Remote_Control.Eomega = recv_pack.rocker[2] / 1647.0f * MAX_ROBOT_OMEGA;
+//    if(xSemaphoreTake(remote_semaphore, pdMS_TO_TICKS(200)) == pdTRUE)
+//    {
+//      /* 1. 保存上一帧 */
+//      Remote_Control.Second = Remote_Control.First;
+//      /* 2. 解析当前按键 */
+//      Key_Parse(recv_pack.Key, &Remote_Control.First);
+//			Remote_Control.Ex = recv_pack.rocker[1] / 1597.0f *MAX_ROBOT_VEL;
+//			Remote_Control.Ey = recv_pack.rocker[0] / 1597.0f *MAX_ROBOT_VEL;
+//			Remote_Control.Eomega = recv_pack.rocker[2] / 1597.0f * MAX_ROBOT_OMEGA;
+//    }else {
+//	    Remote_Control.Ex = 0;
+//      Remote_Control.Ey = 0;
+//      Remote_Control.Eomega = 0;
+//			
+//      memset(&Remote_Control.First, 0, sizeof(Remote_Control.First));
+//    }
 //}
+void Remote_Analysis()
+{
+	/* 1. 保存上一帧 */
+	Remote_Control.Second = Remote_Control.First;
+	/* 2. 解析当前按键 */
+	Key_Parse(recv_pack.Key, &Remote_Control.First);
+	
+	Remote_Control.Ex = recv_pack.rocker[1] / 1597.0f *MAX_ROBOT_VEL;
+	Remote_Control.Ey = recv_pack.rocker[0] / 1597.0f *MAX_ROBOT_VEL;
+	Remote_Control.Eomega = recv_pack.rocker[2] / 1597.0f * MAX_ROBOT_OMEGA;
+}
 
 
 //遥控器滤波降噪 
@@ -236,11 +272,11 @@ void Remote(void *pvParameters)
 	{
 		if(MODE == REMOTE)
 		{			
-//			Remote_Analysis();
+			Remote_Analysis();
 			Vx = Remote_Control.Ex;
 			Vy = -Remote_Control.Ey;
 //			Wz = Remote_Control.Eomega;
-float Wz_cmd = Remote_Control.Eomega;
+      float Wz_cmd = Remote_Control.Eomega;
 			//前馈
 			float Wz_ff = 0;
 			
@@ -251,16 +287,20 @@ float Wz_cmd = Remote_Control.Eomega;
 			float dVy = (Vy - Vy_last) / dt;
 			Vy_last = Vy;
 
-			//Vy限幅（根据最大速度4/dt）
-			if (dVy > 2000.0f)  {dVy = 2000.0f;}
-			if (dVy < -2000.0f) {dVy = -2000.0f;}
+			//Vy限幅（根据最大速度4/dt）(他妈的实际上谁能一帧到2000)
+			if (dVy > 300.0f)  {dVy = 300.0f;}
+			if (dVy < -300.0f) {dVy = -300.0f;}
 
 			//最终滤波
 			dVy_f = 0.7f * dVy_f + 0.3f * dVy;
 
-			if (fabs(dVy_f) > 10.0f)
+			if (fabs(dVy_f) > 50.0f)
 			{
-					Wz_ff = -0.02f * dVy_f;
+					Wz_ff = -0.015f * dVy_f;
+			}
+			else
+			{
+					Wz_ff = 0;
 			}
 			//前馈Wz限幅
 			if (Wz_ff > 0.314f)  {Wz_ff = 0.314f;}
@@ -273,8 +313,14 @@ float Wz_cmd = Remote_Control.Eomega;
 			else
 			{
 				float k = fabs(Vy) / (fabs(Vx) + fabs(Vy) + 0.001f);
-				Wz = Wz_cmd + k * Wz_correction;
+				if (k > 0.5f) { k = 0.5f;} 
+				Wz = Wz_cmd + k * Wz_correction + Wz_ff;
 			}
+			 //最终限幅
+				static float Wz_out = 0;
+				Wz_out = 0.8f * Wz_out + 0.2f * Wz;
+
+				Wz = Wz_out;
 			
 			v1 = -Vy*0.5f+Vx*(sqrtf(3.0f)/2.0f) + R * Wz;
 			v2 = -Vy*0.5f-Vx*(sqrtf(3.0f)/2.0f) + R * Wz;
@@ -296,16 +342,15 @@ float Wz_cmd = Remote_Control.Eomega;
 //			{
 //				flag_two = 1;
 //			}
-//		if(recv_pack.rocker[0] == 0 && recv_pack.rocker[1] == 0 && recv_pack.rocker[2] == 0 )
-////				if(abs(recv_pack.rocker[3]>1500))第二判断法
-//			{
-//	    Remote_Control.Ex = 0;
-//      Remote_Control.Ey = 0;
-//      Remote_Control.Eomega = 0;
-//			
-//      memset(&Remote_Control.First, 0, sizeof(Remote_Control.First));
-//			
-//		 	}
+		if(recv_pack.rocker[0] == 0 && recv_pack.rocker[1] == 0 && recv_pack.rocker[2] == 0 )
+			{
+	    Remote_Control.Ex = 0;
+      Remote_Control.Ey = 0;
+      Remote_Control.Eomega = 0;
+			
+      memset(&Remote_Control.First, 0, sizeof(Remote_Control.First));
+			
+		 	}
 		}
 		if(MODE == STP || MODE == STOP )
 		{
@@ -344,10 +389,10 @@ void Remote_JY61(void *pvParameters){
 
 		float out = JY61_adjust.pid_out;
 
-		if (out > 1.5f)  {out = 1.5f;}
-		if (out < -1.5f) {out = -1.5f;}
+		if (out > 3.5f)  {out = 3.5f;}
+		if (out < -3.5f) {out = -3.5f;}
 		
-		if (fabs(out) < 0.05f)//防抖
+		if (fabs(out) < 0.3f)//防抖
 		{
 				out = 0;
 		}
@@ -364,13 +409,10 @@ void Remote_JY61(void *pvParameters){
 TaskHandle_t Remote_Go_Handle;
 void Remote_Go(void *pvParameters){
 	
-//  TickType_t last_wake_time = xTaskGetTickCount();
-	
    for(;;)
 	{
 		Remote_Analysis();
-		
-//	 vTaskDelayUntil(&last_wake_time, pdMS_TO_TICKS(2));
+
 	 }
 }
 void HAL_CAN_RxFifo1MsgPendingCallback(CAN_HandleTypeDef *hcan)

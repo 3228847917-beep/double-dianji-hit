@@ -11,7 +11,7 @@
 #define MAX_ROBOT_OMEGA PI	 	 //最大角速度
 #define R 0.457f	 	//整车半径
 #define WHEEL_RADIUS 0.075f  //轮的半径
-#define Deadzone_Z 0.157f
+#define Deadzone_Z 0.09f
 
 //电机参数
 typedef struct{
